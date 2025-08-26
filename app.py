@@ -175,9 +175,8 @@ def init_db_command():
 
 
 # --- FINAL FIX: Automatically create database tables on startup ---
-with app.app.context():
+with app.app_context():
     db.create_all()
-
 
 # --- 5. Main Execution Block (for local development) ---
 if __name__ == '__main__':

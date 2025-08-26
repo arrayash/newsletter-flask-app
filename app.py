@@ -8,11 +8,20 @@ from flask_sqlalchemy import SQLAlchemy
 
 # --- 1. App and DB Configuration ---
 app = Flask(__name__)
-# Use a dedicated data directory for the database
-DATA_DIR = os.environ.get('RENDER_INSTANCE_DIR') or os.path.abspath(os.path.dirname(__file__))
-DB_PATH = os.path.join(DATA_DIR, 'subscribers.db')
 
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+# Get the database URL from the environment variable provided by Render.
+# Fallback to a local SQLite database if the variable is not set.
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+if DATABASE_URL:
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+else:
+    # Local development fallback
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'subscribers.db')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 

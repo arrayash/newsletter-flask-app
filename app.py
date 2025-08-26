@@ -1,29 +1,34 @@
 # File: app.py
 # Description: Defines the Flask application, Subscriber model, and web routes
 #              for handling subscription links from the newsletter email.
+# (Final Version for Render PostgreSQL Deployment)
 
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
-# --- 1. App and DB Configuration ---
+# --- 1. App and DB Configuration (Updated for PostgreSQL) ---
 app = Flask(__name__)
 
 # Get the database URL from the environment variable provided by Render.
-# Fallback to a local SQLite database if the variable is not set.
+# Fallback to a local SQLite database if the variable is not set (for local development).
 DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Render provides a DATABASE_URL starting with 'postgres://' but SQLAlchemy needs 'postgresql://'
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 if DATABASE_URL:
+    # Use the PostgreSQL database on Render
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 else:
-    # Local development fallback
+    # Use a local SQLite database for development if DATABASE_URL is not set
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'subscribers.db')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
 
 # --- 2. Database Model ---
 class Subscriber(db.Model):
@@ -35,6 +40,7 @@ class Subscriber(db.Model):
     def __repr__(self):
         status = "Active" if self.subscribed else "Inactive"
         return f"<Subscriber {self.email} - {status}>"
+
 
 # --- 3. Web Routes (to handle clicks from email) ---
 @app.route('/')
@@ -72,23 +78,24 @@ def unsubscribe(email):
         # If they aren't in the DB, they are already effectively unsubscribed.
         return "<h1>Already Unsubscribed</h1><p>Your email was not found in our subscriber list.</p>"
 
-# --- 4. Command Line Interface (CLI) for DB setup ---
+
+# --- 4. Command Line Interface (CLI) for local DB setup ---
 @app.cli.command('init-db')
 def init_db_command():
-    """Creates the database tables."""
+    """Creates the database tables (for local use)."""
     db.create_all()
-    print("Initialized the database.")
+    print("Initialized the local database.")
 
-# --- 5. Main Execution Block (IMPORTANT!) ---
-# This block runs the web server when you execute `python app.py`
+
+# --- FINAL FIX: Automatically create database tables on startup ---
+# This code runs when the application starts on Render.
+# SQLAlchemy is smart enough not to re-create tables that already exist.
+with app.app_context():
+    db.create_all()
+
+
+# --- 5. Main Execution Block (for local development) ---
 if __name__ == '__main__':
-    # We add a check here to remind the user to create the DB first.
-    db_path = os.path.join(basedir, 'subscribers.db')
-    if not os.path.exists(db_path):
-        print("=" * 50)
-        print("DATABASE FILE NOT FOUND!")
-        print(f"Expected at: {db_path}")
-        print("Please run 'flask --app app init-db' in your terminal first.")
-        print("=" * 50)
-    
+    # This block only runs when you execute `python app.py` directly.
+    # It will use the local SQLite database.
     app.run(debug=True)
